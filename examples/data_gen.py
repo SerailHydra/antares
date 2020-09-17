@@ -39,7 +39,7 @@ if os.path.exists(sample_dir):
 os.makedirs(sample_dir)
 
 for key in benchmarks:
-    cmd = "sudo BACKEND=c-cuda COMPUTE_V1=\'" + benchmarks[key] + "\' make"
+    cmd = "cd ..; sudo BACKEND=c-cuda COMPUTE_V1=\'" + benchmarks[key] + "\' make; cd examples"
     os.makedirs(os.path.join(sample_dir, key))
     print(cmd)
     os.system(cmd)
