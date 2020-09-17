@@ -11,7 +11,7 @@ HARDWARE_CONFIG ?=
 CPU_THREADS ?= 8
 INNER_CMD = ./run.sh
 
-PARAMS ?=  docker run -v $(shell pwd):/antares -w /antares/antares --privileged -v /:/host \
+PARAMS ?=  docker run -v $(shell pwd):/antares -w /antares/antares --privileged -v /:/host -v /mydata:/tmp \
 	-v $(shell dirname `ldd /usr/lib/x86_64-linux-gnu/libcuda.so.1 2>/dev/null | grep nvidia-fatbinaryloader | awk '{print $$3}'` 2>/dev/null):/usr/local/nvidia/lib64 \
 	-v $(shell pwd)/public/roc_prof:/usr/local/bin/rp -e CPU_THREADS=$(CPU_THREADS) -e RECORD=$(RECORD) \
 	-e STEP=$(STEP) -e AGENT_URL=$(AGENT_URL) -e TUNER=$(TUNER) -e CONFIG='$(CONFIG)' -e BACKEND=$(BACKEND) -e COMPUTE_V1='$(COMPUTE_V1)' \
