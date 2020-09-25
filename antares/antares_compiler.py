@@ -115,6 +115,7 @@ def run_config_entity(params_given, dir_sid, expected_timecost='inf', tune_slot_
       parts = fp.read().split()
       result = float(parts[0].strip())
       digest = float(parts[1].strip()) if len(parts) > 1 else float('inf')
+      print("@@@@@@@@@@@ MY DEBUG: config = %s, source_path = %s, perf = %s @@@@@@@@@@@" % (config_str, local_get_dir_file('my_kernel.cc', dir_sid), result))
   except:
     result = digest = float('inf')
   print("  >> [*] Param_entity on sid = %s: config = %s, result = `%.6f`, digest = `%g`" % (dir_sid, config_str, result, digest))

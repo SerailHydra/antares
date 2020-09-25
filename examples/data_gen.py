@@ -43,3 +43,6 @@ for key in benchmarks:
     os.makedirs(os.path.join(sample_dir, key))
     print(cmd)
     os.system(cmd)
+    os.system("sudo mv /mydata/libAntares/cache/* {}".format(os.path.join(sample_dir, key)))
+
+
