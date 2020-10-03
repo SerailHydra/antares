@@ -3,7 +3,7 @@
 import ptx
 from ptx import *
 
-class dag:
+class ptx_parser:
     def __init__(self, ptx_file):
         print(ptx_file)
         self.params = []
@@ -54,9 +54,6 @@ class dag:
         self.regs["%ctaid.x"] = {"val": None}
         self.regs["%ctaid.y"] = {"val": None}
 
-    def _build_dag(self):
-        
-        pass
 
     def simulate(self):
         GLSProgress = 0
