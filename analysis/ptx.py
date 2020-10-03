@@ -31,6 +31,7 @@ class ptx():
         self.outputs = params[0]
         print(self.cmd, params)
 
+
     def execute(self, regs, labels, asm_i):
         # load and store: pass
         if self.cmd.startswith("ld.") or self.cmd.startswith("st."):
@@ -40,8 +41,8 @@ class ptx():
             return -1
         # branching 
         if self.cmd == "bra":
-            assert regs[self.cond] != None
-            if regs[self.cond]:
+            assert regs[self.cond]["val"] != None
+            if regs[self.cond]["val"]:
                 return labels[self.dst]
             else:
                 return asm_i + 1
@@ -63,16 +64,29 @@ class ptx():
                 v.append(int(in_reg))
         if not flag:
             # skip when there are unknown registers
+            regs[self.outputs]["val"] = None
             return asm_i + 1
         if self.cmd.startswith("setp.ne."):
-            regs[self.outputs] = v[0] != v[1]
-        if self.cmd.startswith("mv."):
-            regs[self.outputs] = v[0]
+            regs[self.outputs]["val"] = v[0] != v[1]
+        if self.cmd.startswith("mov."):
+            regs[self.outputs]["val"] = v[0]
         if self.cmd.startswith("fma."):
-            regs[self.outputs] = v[0] * v[1] + v[2]
+            regs[self.outputs]["val"] = v[0] * v[1] + v[2]
         if self.cmd.startswith("add."):
-            regs[self.outputs] = v[0] + v[1]
-        print("calc {}".format(self.outputs))
+            regs[self.outputs]["val"] = v[0] + v[1]
+        print("calc {} {}".format(self.outputs, regs[self.outputs]["val"]))
         return asm_i + 1
 
+    def exec_stream(self):
+        if self.cmd.startswith("ld.") or self.cmd.startswith("st."):
+            return "GLS"
+        if self.cmd.startswith("sts."):
+            return "SAS"
+        return "CS"
+
+    def latency(self):
+        if exec_stream() == "GLS":
+            # total load / DRAM bandwidth
+        if exec_stream() == "CS":
+        pass
 

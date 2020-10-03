@@ -6,7 +6,6 @@ import dag
 from dag import *
 
 def main(args):
-    print("main")
     DAG = dag(args.ptx_file)
     DAG.simulate()
     pass

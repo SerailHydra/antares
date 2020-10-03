@@ -69,8 +69,7 @@ class dag:
         asm_i = 0
         while asm_i != -1:
             asm = self.asms[asm_i]
-            print("exec {} {}".format(asm_i, asm.cmd))
             asm_i = asm.execute(self.regs, self.labels, asm_i)
-
+            
 
 
