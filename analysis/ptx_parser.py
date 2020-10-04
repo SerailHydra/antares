@@ -52,8 +52,27 @@ class ptx_parser:
                     self.asms.append(asm)
         # set block indecies to unknown
         self.regs["%ctaid.x"] = {"val": None}
-        self.regs["%ctaid.y"] = {"val": None}
+        self.regs["%ctaid.y"] = {"val": None} 
 
+    def register_size_used(self):
+        # return the total size of allocated register files in Bytes
+        rf_size = 0
+        for reg in regs:
+            if reg["dtype"] == ".pred":
+                rf_size += 1
+            elif reg["dtype"].endswidth("8"):
+                rf_size += 1
+            elif reg["dtype"].endswidth("16"):
+                rf_size += 2
+            elif reg["dtype"].endswidth("32"):
+                rf_size += 4
+            elif reg["dtype"].endswidth("64"):
+                rf_size += 8
+        return rf_size
+        
+    def shared_memory_used(self):
+        # return the total size of allocated shared memory
+        return 0
 
     def simulate(self):
         GLSProgress = 0
