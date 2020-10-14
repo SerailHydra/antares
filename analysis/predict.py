@@ -2,8 +2,8 @@
 # output: the execution time
 
 import os, argparse
-import dag
-from dag import *
+import ptx_parser, gpu_config
+from ptx_parser import *
 from gpu_config import *
 
 def get_TB_size_count(cu_file):
@@ -29,17 +29,18 @@ def get_TB_size_count(cu_file):
                 TB_size_x = val
     return TB_size_x * TB_size_y, TB_count_x * TB_count_y
 
-def estimate_TB(ptx_parser, hw_config, batch_size)
+def estimate_TB(ptx_parser, hw_config, batch_size):
     # Estimate the given the performance of one TB 
     # need to know how many TBs can run concurrently (batch_size) to determine the DRAM traffic
-    TB_perf["pipeline_latency"] = 
-    TB_perf["transfer_latency"] = 
-    TB_perf["compute_latency"] = 
+    TB_perf = {}
+    TB_perf["pipeline_latency"] = 0
+    TB_perf["transfer_latency"] = batch_size * 8 / hw_config.DRAM_BW
+    TB_perf["compute_latency"] = 0
     return TB_perf
 
 def estimate_batch(ptx_parser, hw_config, batch_size, TB_perf):
+    return TB_perf["transfer_latency"]
     # Estimate the given the performance of one TB batch, given the performance of single TBs
-    pass
 
 def estimate_all(cu_file, ptx_parser, hw_config):
     # The process of estimating performance
@@ -57,7 +58,9 @@ def estimate_all(cu_file, ptx_parser, hw_config):
     TB_size, TB_count = get_TB_size_count(cu_file)
     # how many TBs can execute in parallel (size of one TB batch)
     batch_size = min(TB_count,
-                     hw_config.TF_SIZE * 1024 // ptx_parser.register_size_used())
+                     hw_config.RF_SIZE * 1024 // ptx_parser.register_size_used())
+    print("reg size {}".format(ptx_parser.register_size_used()))
+    print("size of a TB batch is {}".format(batch_size))
     if ptx_parser.shared_memory_used() != 0:
         batch_size = min(batch_size,
                          hw_config.SHARED_MEMORY_SIZE * 1024 // ptx_parser.shared_memory_used())
@@ -78,7 +81,7 @@ def estimate_all(cu_file, ptx_parser, hw_config):
 def main(args):
     ptx_ = ptx_parser(args.ptx_file)
     cu_ = args.cu_file
-    estimate_all(cu_, ptx_, GPU_Config())
+    print(estimate_all(cu_, ptx_, GPU_Config()))
 
 
 if __name__ == "__main__":

@@ -51,22 +51,23 @@ class ptx_parser:
                 elif asm.cmd:
                     self.asms.append(asm)
         # set block indecies to unknown
-        self.regs["%ctaid.x"] = {"val": None}
-        self.regs["%ctaid.y"] = {"val": None} 
+        self.regs["%ctaid.x"] = {"dtype": "int32", "val": None}
+        self.regs["%ctaid.y"] = {"dtype": "int32", "val": None} 
 
     def register_size_used(self):
         # return the total size of allocated register files in Bytes
         rf_size = 0
-        for reg in regs:
+        for key in self.regs:
+            reg = self.regs[key]
             if reg["dtype"] == ".pred":
                 rf_size += 1
-            elif reg["dtype"].endswidth("8"):
+            elif reg["dtype"].endswith("8"):
                 rf_size += 1
-            elif reg["dtype"].endswidth("16"):
+            elif reg["dtype"].endswith("16"):
                 rf_size += 2
-            elif reg["dtype"].endswidth("32"):
+            elif reg["dtype"].endswith("32"):
                 rf_size += 4
-            elif reg["dtype"].endswidth("64"):
+            elif reg["dtype"].endswith("64"):
                 rf_size += 8
         return rf_size
         

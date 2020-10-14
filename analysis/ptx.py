@@ -87,6 +87,7 @@ class ptx():
     def latency(self):
         if exec_stream() == "GLS":
             # total load / DRAM bandwidth
+            pass
         if exec_stream() == "CS":
-        pass
+            pass
 
