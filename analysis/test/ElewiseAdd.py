@@ -1,7 +1,10 @@
 # input: ptx, config
 # output: the execution time
 
-import os, argparse
+import sys
+import os
+import argparse
+sys.path.append(os.getcwd() + '/..')
 import ptx_parser, gpu_config
 from ptx_parser import *
 from gpu_config import *
@@ -29,17 +32,26 @@ def get_TB_size_count(cu_file):
                 TB_size_x = val
     return TB_size_x * TB_size_y, TB_count_x * TB_count_y
 
-def estimate_TB(ptx_parser, hw_config, batch_size):
+def estimate_TB(ptx_parser, hw_config, TB_size, batch_size):
     # Estimate the given the performance of one TB 
     # need to know how many TBs can run concurrently (batch_size) to determine the DRAM traffic
     TB_perf = {}
-    TB_perf["pipeline_latency"] = 100
-    TB_perf["transfer_latency"] = batch_size * 8 / hw_config.DRAM_BW
+    TB_perf["pipeline_latency"] = 128
+    TB_perf["transfer_latency"] = batch_size * TB_size * 8 / hw_config.DRAM_BW
     TB_perf["compute_latency"] = 0
     return TB_perf
 
-def estimate_batch(ptx_parser, hw_config, batch_size, TB_perf):
-    return TB_perf["transfer_latency"] + TB_perf["pipeline_latency"]
+def estimate_batch(ptx_parser, hw_config, TB_size, batch_size, TB_perf):
+    t_Epilogue = batch_size * TB_size * 4 / hw_config.DRAM_BW
+    # DRAM bandwidth is the bottleneck
+    print("transfer latency is {} ns".format(TB_perf["transfer_latency"]))
+    t0 = (TB_perf["transfer_latency"] + t_Epilogue)
+    # DRAM pipeline latency is the bottleneck
+    t1 = (TB_perf["pipeline_latency"] * batch_size) / hw_config.SM_COUNT
+    print("BW bottleneck is {} ns, pipeline bottleneck is {} ns".format(t0, t1))
+    return max(t0, t1)
+    #print("Transfer latency is {} ns".format(TB_perf["transfer_latency"]))
+    #return (TB_perf["pipeline_latency"] * batch_size + TB_perf["transfer_latency"]) / hw_config.SM_COUNT
     # Estimate the given the performance of one TB batch, given the performance of single TBs
 
 def estimate_all(cu_file, ptx_parser, hw_config):
@@ -56,6 +68,9 @@ def estimate_all(cu_file, ptx_parser, hw_config):
     # 3, Estimate the total elapsed time
     
     TB_size, TB_count = get_TB_size_count(cu_file)
+    TB_size, TB_count = 1024, 524288
+    print("# of threads in one TBs is {}".format(TB_size))
+    print("# of TBs in total is {}".format(TB_count))
     # how many TBs can execute in parallel (size of one TB batch)
     batch_size = min(TB_count,
                      hw_config.RF_SIZE * 1024 // ptx_parser.register_size_used())
@@ -67,17 +82,19 @@ def estimate_all(cu_file, ptx_parser, hw_config):
                          TB_per_SM * hw_config.SM_COUNT)
     print("# of active TBs in parallel is {}".format(batch_size))
     batch_count = TB_count // batch_size # number of TB batches
+    print("batch count is {}".format(batch_count))
     rem_size = TB_count - batch_count * batch_size
 
     # step 1: estimating the performance of a single TB
-    TB_perf_batch = estimate_TB(ptx_parser, hw_config, batch_size)
-    TB_perf_rem = estimate_TB(ptx_parser, hw_config, rem_size)
+    TB_perf_batch = estimate_TB(ptx_parser, hw_config, TB_size, batch_size)
+    TB_perf_rem = estimate_TB(ptx_parser, hw_config, TB_size, rem_size)
     
     # step 2: estimating the performance of a TB batch
-    batch_latency = estimate_batch(ptx_parser, hw_config, batch_size, TB_perf_batch)
-    rem_latency = estimate_batch(ptx_parser, hw_config, rem_size, TB_perf_rem)
+    batch_latency = estimate_batch(ptx_parser, hw_config, TB_size, batch_size, TB_perf_batch)
+    rem_latency = estimate_batch(ptx_parser, hw_config, TB_size, rem_size, TB_perf_rem)
     
     # step 3: estimating the final performance
+    print("batch latency is {}".format(batch_latency))
     return batch_latency * batch_count + rem_latency
 
 def main(args):

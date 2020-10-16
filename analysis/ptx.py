@@ -74,7 +74,6 @@ class ptx():
             regs[self.outputs]["val"] = v[0] * v[1] + v[2]
         if self.cmd.startswith("add."):
             regs[self.outputs]["val"] = v[0] + v[1]
-        print("calc {} {}".format(self.outputs, regs[self.outputs]["val"]))
         return asm_i + 1
 
     def exec_stream(self):

@@ -5,7 +5,6 @@ from ptx import *
 
 class ptx_parser:
     def __init__(self, ptx_file):
-        print(ptx_file)
         self.params = []
         self.regs = {} # name -> {dtype, val}
         self.asms = []

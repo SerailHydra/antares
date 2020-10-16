@@ -26,7 +26,7 @@ class GPU_Config(object):
     SHARED_MEMORY_SIZE = 96
     
     # DRAM bandwidth in GB per second
-    DRAM_BW = 900
+    DRAM_BW = 810
 
     def __init__(self):
         pass
