@@ -56,11 +56,12 @@ def estimate_all(cu_file, ptx_parser, hw_config):
     # 3, Estimate the total elapsed time
     
     TB_size, TB_count = get_TB_size_count(cu_file)
+    print("Block size = {}".format(TB_size))
+    print("Grid size = {}".format(TB_count))
     # how many TBs can execute in parallel (size of one TB batch)
     batch_size = min(TB_count,
-                     hw_config.RF_SIZE * 1024 // ptx_parser.register_size_used())
+                     hw_config.RF_SIZE * 1024 // (ptx_parser.register_size_used() * TB_size) * hw_config.SM_COUNT)
     print("reg size {}".format(ptx_parser.register_size_used()))
-    print("size of a TB batch is {}".format(batch_size))
     if ptx_parser.shared_memory_used() != 0:
         TB_per_SM = hw_config.SHARED_MEMORY_SIZE * 1024 // ptx_parser.shared_memory_used()
         batch_size = min(batch_size,

@@ -1,4 +1,5 @@
 import os, torch
+import json
 from torch.contrib.antares.custom_op import CustomOp
 
 sample_dir = "samples"
@@ -8,7 +9,7 @@ benchmarks = {
     "BroadcastAll": '- einstein_v2("output0[N, F, HO, WO] = input0[0] where N in 8, F in 32, HO in 2, WO in 2", input_dict={"input0": {"dtype": "float32", "shape": [1]}})',
     "MatMul": '- einstein_v2("output0[N, M] +=! input0[N, K] * input1[K, M]", { "input0": {"dtype": "float32", "shape": [1024, 512]}, "input1": {"dtype": "float32", "shape": [512, 512]}})',
     "BatchMatMul": '- einstein_v2("output0[B, N, M] +=! input0[B, N, K] * input1[B, K, M]", input_dict={"input0": {"dtype": "float32", "shape": [3, 1024, 512]}, "input1": {"dtype": "float32", "shape": [3, 512, 512]}})',
-    "ElementWise": '- einstein_v2("output0[N] = input0[N] + input1[N]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 512]}, "input1": {"dtype": "float32", "shape": [1024 * 512]}})',
+    "ElementWise": '- einstein_v2("output0[N] = input0[N] + input1[N]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 1024 * 128]}, "input1": {"dtype": "float32", "shape": [1024 * 1024 * 128]}})',
     "Transpose": '- einstein_v2("output0[N, C, H, W] = input0[N, H, W, C]", input_dict={"input0": {"dtype": "float32", "shape": [32, 229, 229, 3]}})',
     "Reduce": '- einstein_v2("output0[A, B, C] = input0[A, B, C // 64, C % 64] where C in 128", input_dict={"input0": {"dtype": "float32", "shape": [3, 3, 2, 64]}})',
     "ReduceSum": '- einstein_v2("output0[N] +=! input0[N, C]", input_dict={"input0": {"dtype": "float32", "shape": [32, 1024]}})',
@@ -31,7 +32,10 @@ benchmarks = {
     "SoftmaxV1": '- einstein_v2("temp0[N] >=! input0[N, C]",                                            { "input0": {"dtype": "float32", "shape": [32, 1024]} })',
     "SoftmaxV2": '- einstein_v2("temp1[N] +=! (input0[N, C] - temp0[N]).call(\"exp\")",                 { "input0": {"dtype": "float32", "shape": [32, 1024]}, "temp0": {"dtype": "float32", "shape": [32]} })',
     "SoftmaxV3": '- einstein_v2("output0[N, C] = (input0[N, C] - temp0[N]).call(\"exp\") / temp1[N]",   { "input0": {"dtype": "float32", "shape": [32, 1024]}, "temp0": {"dtype": "float32", "shape": [32]}, "temp1": {"dtype": "float32", "shape": [32]} })'
-    
+}
+
+configs = {
+        "ElementWise": ['{"axis_0": [-1, 16, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 4, 1024, 2], "reorder": [0]}', '{"axis_0": [-1, 64, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 32, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 1, 32, 128], "reorder": [0]}', '{"axis_0": [-1, 128, 16, 4], "reorder": [0]}']
 }
 
 if os.path.exists(sample_dir):
@@ -39,10 +43,34 @@ if os.path.exists(sample_dir):
 os.makedirs(sample_dir)
 
 for key in benchmarks:
-    cmd = "cd ..; sudo BACKEND=c-cuda COMPUTE_V1=\'" + benchmarks[key] + "\' make; cd examples"
-    os.makedirs(os.path.join(sample_dir, key))
-    print(cmd)
-    os.system(cmd)
-    os.system("sudo mv /mydata/libAntares/cache/* {}".format(os.path.join(sample_dir, key)))
-
+    if key != "ElementWise":
+        continue
+    #if key in configs:
+    v = 0
+    for i in range(0, 9):
+        for j in range(0, 9):
+            for k in range(0, 9):
+                #for config in configs[key]:
+                config = '{' + "\"axis_0\"" + ': [-1, {}, {}, {}], "reorder": [0]'.format(pow(2, i), pow(2, j), pow(2, k)) + '}'
+                cmd = "cd ..; sudo BACKEND=c-cuda CONFIG=\'{}\' COMPUTE_V1=\'{}\' make; cd examples".format(config, benchmarks[key])
+                print(cmd)
+                dir_path = os.path.join(sample_dir, key, str(v))
+                os.makedirs(dir_path)
+                os.system(cmd)
+                dim = json.loads(config)["axis_0"]
+                size = 128 * 1024 * 1024
+                TB_count = size // (dim[1] * dim[2] * dim[3])
+                TB_size = dim[2]
+                os.system("sudo mv /mydata/libAntares/cache/* {}".format(dir_path))
+                os.system("cp {}/_/my_kernel.out .".format(dir_path))
+                os.system("/usr/local/cuda/bin/nvcc -lcuda ElementWiseTest.cu -o ElementWiseTest")
+                os.system("sudo /usr/local/cuda/bin/nvprof --metrics dram_read_bytes,dram_write_bytes ./ElementWiseTest {} {}".format(TB_count, TB_size))
+                os.system("sudo /opt/nvidia/nsight-compute/2020.1.2/ncu --set full ./ElementWiseTest {} {}".format(TB_count, TB_size))
+                v += 1
+    else:
+        cmd = "cd ..; sudo BACKEND=c-cuda COMPUTE_V1=\'" + benchmarks[key] + "\' make; cd examples"
+        os.makedirs(os.path.join(sample_dir, key))
+        print(cmd)
+        os.system(cmd)
+        os.system("sudo mv /mydata/libAntares/cache/* {}".format(os.path.join(sample_dir, key)))
 
