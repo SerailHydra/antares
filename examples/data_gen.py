@@ -10,9 +10,9 @@ benchmarks = {
     "MatMul": '- einstein_v2("output0[N, M] +=! input0[N, K] * input1[K, M]", { "input0": {"dtype": "float32", "shape": [1024, 512]}, "input1": {"dtype": "float32", "shape": [512, 512]}})',
     "BatchMatMul": '- einstein_v2("output0[B, N, M] +=! input0[B, N, K] * input1[B, K, M]", input_dict={"input0": {"dtype": "float32", "shape": [3, 1024, 512]}, "input1": {"dtype": "float32", "shape": [3, 512, 512]}})',
     "ElementWise": '- einstein_v2("output0[N] = input0[N] + input1[N]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 1024 * 128]}, "input1": {"dtype": "float32", "shape": [1024 * 1024 * 128]}})',
-    "Transpose": '- einstein_v2("output0[N, C, H, W] = input0[N, H, W, C]", input_dict={"input0": {"dtype": "float32", "shape": [32, 229, 229, 3]}})',
+    "Transpose": '- einstein_v2("output0[N, M] = input0[M, N]", input_dict={"input0": {"dtype": "float32", "shape": [1024, 1024]}})',
     "Reduce": '- einstein_v2("output0[A, B, C] = input0[A, B, C // 64, C % 64] where C in 128", input_dict={"input0": {"dtype": "float32", "shape": [3, 3, 2, 64]}})',
-    "ReduceSum": '- einstein_v2("output0[N] +=! input0[N, C]", input_dict={"input0": {"dtype": "float32", "shape": [32, 1024]}})',
+    "ReduceSum": '- einstein_v2("output0[N] +=! input0[N, C]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 64, 2 * 1024]}})',
     "ReduceMin": '- einstein_v2("output0[N] <=! input0[N, C]", input_dict={"input0": {"dtype": "float32", "shape": [32, 1024]}})',
     "ConditionalRelu": '- einstein_v2("output0[N] = input0[N].when([input0[N] > 0.0], 0.0)", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 512]}})',
     "ConvolutionNoPad": '- _N, _C, _HW, _F, _K, _S = 512, 3, 227, 64, 11, 4; _HWO = (_HW - _K) // _S + 1; einstein_v2("output0[N, F, HO, WO] +=! input0[N, C, HO * %d + KH, WO * %d + KW] * input1[F, C, KH, KW] where HO in %d, WO in %d" % (_S, _S, _HWO, _HWO), { "input0": {"dtype": "float32", "shape": [_N, _C, _HW, _HW]}, "input1": {"dtype": "float32", "shape": [_F, _C, _K, _K]}})',
@@ -35,18 +35,36 @@ benchmarks = {
 }
 
 configs = {
-        "ElementWise": ['{"axis_0": [-1, 16, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 4, 1024, 2], "reorder": [0]}', '{"axis_0": [-1, 64, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 32, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 1, 32, 128], "reorder": [0]}', '{"axis_0": [-1, 128, 16, 4], "reorder": [0]}']
+        "ElementWise": ['{"axis_0": [-1, 16, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 4, 1024, 2], "reorder": [0]}', '{"axis_0": [-1, 64, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 32, 64, 1], "reorder": [0]}', '{"axis_0": [-1, 1, 32, 128], "reorder": [0]}', '{"axis_0": [-1, 128, 16, 4], "reorder": [0]}'],
+        "ReduceSum": ['{"axis_0": [-1, 4, 32, 8], "reorder": [0], "reduce_0": [-1, 8, 16]}', '{"axis_0": [-1, 4, 64, 8], "reorder": [0], "reduce_0": [-1, 4, 32]}', '{"axis_0": [-1, 4, 64, 8], "reorder": [0], "reduce_0": [-1, 16, 4]}', '{"axis_0": [-1, 4, 64, 8], "reorder": [0], "reduce_0": [-1, 32, 1]}']
 }
 
-if os.path.exists(sample_dir):
-    os.system("rm -rf {}".format(sample_dir))
-os.makedirs(sample_dir)
+def write_config(config, operator, dir_path, args, test_prog):
+    os.system("cd ..")
+    os.system("sudo BACKEND=c-cuda CONFIG=\'{}\' COMPUTE_V1=\'{}\' make".format(config, operator))
+    os.system("cd examples")
+    os.makedirs(dir_path)
+    os.system("sudo mv /mydata/libAntares/cache/* {}".format(dir_path))
+    os.system("cp {}/_/my_kernel.out .".format(dir_path))
+    os.system("/usr/local/cuda/bin/nvcc -lcuda {}.cu -o {}".format(test_prog, test_prog))
+    os.system("sudo /usr/local/cuda/bin/nvprof --metrics dram_read_bytes,dram_write_bytes ./{} {}".format(test_prog, args))
+    os.system("sudo /opt/nvidia/nsight-compute/2020.1.2/ncu --set full ./{} {}".format(test_prog, args))
+
+
+clean = False
+if clean:
+    if os.path.exists(sample_dir):
+        os.system("rm -rf {}".format(sample_dir))
+    os.makedirs(sample_dir)
 
 for key in benchmarks:
-    if key != "ElementWise":
+    if key != "ReduceSum":
         continue
     #if key in configs:
+    
     v = 0
+    """
+    # ElementWise configs
     for i in range(0, 9):
         for j in range(0, 9):
             for k in range(0, 9):
@@ -67,10 +85,36 @@ for key in benchmarks:
                 os.system("sudo /usr/local/cuda/bin/nvprof --metrics dram_read_bytes,dram_write_bytes ./ElementWiseTest {} {}".format(TB_count, TB_size))
                 os.system("sudo /opt/nvidia/nsight-compute/2020.1.2/ncu --set full ./ElementWiseTest {} {}".format(TB_count, TB_size))
                 v += 1
-    else:
-        cmd = "cd ..; sudo BACKEND=c-cuda COMPUTE_V1=\'" + benchmarks[key] + "\' make; cd examples"
-        os.makedirs(os.path.join(sample_dir, key))
+    """
+
+    for i in range(0, 8):
+        for j in range(0, 8):
+            for k in range(0, 8):
+                #for config in configs[key]:
+                config = '{' + "\"axis_0\"" + ': [-1, {}, {}, {}], "reorder": [0], "reduce_0": [-1, 1, 1]'.format(pow(2, i), pow(2, j), pow(2, k)) + '}'
+                cmd = "cd ..; sudo BACKEND=c-cuda CONFIG=\'{}\' COMPUTE_V1=\'{}\' make; cd examples".format(config, benchmarks[key])
+                print(cmd)
+                dir_path = os.path.join(sample_dir, key, str(v))
+                os.makedirs(dir_path)
+                os.system(cmd)
+                dim = json.loads(config)["axis_0"]
+                size = 128 * 1024 * 1024
+                TB_count = size // (dim[1] * dim[2] * dim[3])
+                TB_size = dim[2]
+                os.system("sudo mv /mydata/libAntares/cache/* {}".format(dir_path))
+                os.system("cp {}/_/my_kernel.out .".format(dir_path))
+                os.system("/usr/local/cuda/bin/nvcc -lcuda ReduceSumTest.cu -o ReduceSumTest")
+                os.system("sudo /usr/local/cuda/bin/nvprof --metrics dram_read_bytes,dram_write_bytes ./ReduceSumTest {} {}".format(TB_count, TB_size))
+                os.system("sudo /opt/nvidia/nsight-compute/2020.1.2/ncu --set full ./ReduceSumTest {} {}".format(TB_count, TB_size))
+                v += 1
+
+    for config in configs[key]:
+        cmd = "cd ..; sudo CONFIG=\'{}\' BACKEND=c-cuda COMPUTE_V1=\'".format(config) + benchmarks[key] + "\' make; cd examples"
+        data_path = os.path.join(sample_dir, key, str(v))
+        os.system("rm -rf {}".format(data_path))
+        os.makedirs(data_path)
         print(cmd)
         os.system(cmd)
-        os.system("sudo mv /mydata/libAntares/cache/* {}".format(os.path.join(sample_dir, key)))
+        os.system("sudo mv /mydata/libAntares/cache/* {}".format(data_path))
+        v += 1
 

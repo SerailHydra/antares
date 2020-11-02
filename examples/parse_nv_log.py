@@ -24,7 +24,14 @@ with open("log.txt", "r") as logfile:
         if 'Memory Throughput' in line:
             tp = float(line.split(" ")[-1])
             item.append(tp)
+        if "L1/TEX Hit Rate" in line:
+            l1_hit = float(line.split(" ")[-1])
+            item.append(l1_hit)
+        if "L2 Hit Rate" in line:
+            l2_hit = float(line.split(" ")[-1])
+            item.append(l2_hit)
             items.append(item)
+
 
 threads = [8, 32, 128]
 
@@ -61,4 +68,19 @@ for thread in threads:
                 else:
                     f.write(str(item[4]) + "\n")
 
+    with open("l1_hit_{}.csv".format(thread), "w") as f:
+        for item in items:
+            if item[0][2] == thread:
+                if item[0][3] < 256:
+                    f.write(str(item[5]) + ",")
+                else:
+                    f.write(str(item[5]) + "\n")
+
+    with open("l2_hit_{}.csv".format(thread), "w") as f:
+        for item in items:
+            if item[0][2] == thread:
+                if item[0][3] < 256:
+                    f.write(str(item[6]) + ",")
+                else:
+                    f.write(str(item[6]) + "\n")
 
