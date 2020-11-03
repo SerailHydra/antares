@@ -10,7 +10,7 @@ benchmarks = {
     "MatMul": '- einstein_v2("output0[N, M] +=! input0[N, K] * input1[K, M]", { "input0": {"dtype": "float32", "shape": [1024, 512]}, "input1": {"dtype": "float32", "shape": [512, 512]}})',
     "BatchMatMul": '- einstein_v2("output0[B, N, M] +=! input0[B, N, K] * input1[B, K, M]", input_dict={"input0": {"dtype": "float32", "shape": [3, 1024, 512]}, "input1": {"dtype": "float32", "shape": [3, 512, 512]}})',
     "ElementWise": '- einstein_v2("output0[N] = input0[N] + input1[N]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 1024 * 128]}, "input1": {"dtype": "float32", "shape": [1024 * 1024 * 128]}})',
-    "Transpose": '- einstein_v2("output0[N, M] = input0[M, N]", input_dict={"input0": {"dtype": "float32", "shape": [1024, 1024]}})',
+    "Transpose": '- einstein_v2("output0[N, M] = input0[M, N]", input_dict={"input0": {"dtype": "float32", "shape": [8 * 1024, 8 * 1024]}})',
     "Reduce": '- einstein_v2("output0[A, B, C] = input0[A, B, C // 64, C % 64] where C in 128", input_dict={"input0": {"dtype": "float32", "shape": [3, 3, 2, 64]}})',
     "ReduceSum": '- einstein_v2("output0[N] +=! input0[N, C]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 64, 2 * 1024]}})',
     "ReduceMin": '- einstein_v2("output0[N] <=! input0[N, C]", input_dict={"input0": {"dtype": "float32", "shape": [32, 1024]}})',

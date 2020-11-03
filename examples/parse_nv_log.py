@@ -33,54 +33,60 @@ with open("log.txt", "r") as logfile:
             items.append(item)
 
 
-threads = [8, 32, 128]
+threads = [1, 8, 32, 128]
 
 for thread in threads:
     with open("dram_read_{}.csv".format(thread), "w") as f:
         for item in items:
             if item[0][2] == thread:
-                if item[0][3] < 256:
-                    f.write(str(item[1]) + ",")
+                if item[0][3] == 1:
+                    f.write("\n")
                 else:
-                    f.write(str(item[1]) + "\n")
+                    f.write(",")
+                f.write(str(item[1]))
 
     with open("dram_write_{}.csv".format(thread), "w") as f:
         for item in items:
             if item[0][2] == thread:
-                if item[0][3] < 256:
-                    f.write(str(item[2]) + ",")
+                if item[0][3] == 1:
+                    f.write("\n")
                 else:
-                    f.write(str(item[2]) + "\n")
+                    f.write(",")
+                f.write(str(item[2]))
 
     with open("cycles_{}.csv".format(thread), "w") as f:
         for item in items:
             if item[0][2] == thread:
-                if item[0][3] < 256:
-                    f.write(str(item[3]) + ",")
+                if item[0][3] == 1:
+                    f.write("\n")
                 else:
-                    f.write(str(item[3]) + "\n")
+                    f.write(",")
+                f.write(str(item[3]))
 
     with open("memory_throughput_{}.csv".format(thread), "w") as f:
         for item in items:
             if item[0][2] == thread:
-                if item[0][3] < 256:
-                    f.write(str(item[4]) + ",")
+                if item[0][3] == 1:
+                    f.write("\n")
                 else:
-                    f.write(str(item[4]) + "\n")
+                    f.write(",")
+                f.write(str(item[4]))
 
     with open("l1_hit_{}.csv".format(thread), "w") as f:
         for item in items:
             if item[0][2] == thread:
-                if item[0][3] < 256:
-                    f.write(str(item[5]) + ",")
+                if item[0][3] == 1:
+                    f.write("\n")
                 else:
-                    f.write(str(item[5]) + "\n")
+                    f.write(",")
+                f.write(str(item[5]))
 
     with open("l2_hit_{}.csv".format(thread), "w") as f:
         for item in items:
             if item[0][2] == thread:
-                if item[0][3] < 256:
-                    f.write(str(item[6]) + ",")
+                if item[0][3] == 1:
+                    f.write("\n")
                 else:
-                    f.write(str(item[6]) + "\n")
+                    f.write(",")
+                f.write(str(item[6]))
 
