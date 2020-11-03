@@ -85,7 +85,7 @@ class OpTensor:
         return OpTensor('op', {"name": "-", "inputs": [other, self]}, self._dtype, self._flopbase + other._flopbase + self.filter_flop(other))
 
     def __neg__(self):
-        return OpTensor('op', {"name": "-", "inputs": [self]}, self._dtype, self._flopbase + self.filter_flop(self))
+        return OpTensor('op', {"name": "-", "inputs": [OpTensor.parse(0), self]}, self._dtype, self._flopbase + self.filter_flop(self))
 
     # Relation Ops
     def __lt__ (self, other):
@@ -205,7 +205,7 @@ def parse_to_ast(expr, input_dict={}):
   for x in explicit_range:
     each_range = explicit_range[x]._value["range"]
     if each_range is None:
-      raise Exception("The range of axis `%s` is undeterminzed, please use `where` clause to set explicitly." % x)
+      raise Exception("The range of axis `%s` is undeterminzed, please use `where` clause to set the range explicitly." % x)
 
   # Collect output inferences & compute flopbase
   props['flopbase'] = max(1, _root._flopbase if props['reduce_type'] is None else _root._flopbase + 1)
@@ -243,27 +243,21 @@ def emit_tvm_body(node, props):
     tensor = node._value['tensor']
     index = node._value['index']
     _str = tensor._value['name'] + '['
-    if 'slices' in props:
-      if tensor._value['name'] in [x for x in props['slices'][0][-1]]:
-        for i, it in enumerate(index):
-          _str += emit_tvm_body(it, props) + ', '
-        _str = _str[:-2] + ' - _%s]' % tensor._value['name']
-      else:
-        for i, it in enumerate(index):
-          if it._op != 'axis':
-            raise Exception("Unexpected injective axis type from %s: %s" % (tensor._value['name'], it._op))
-          _str += warp_axis(it._value['name']) + ', '
-        _str = _str[:-2] + ']'
+    if 'shard' in props:
+      book = props['shard']['book'][tensor._value['name']]
+      for i, it in enumerate(index):
+        if book[i][0] < 0:
+          raise Exception("Unhandled book case:", book[i])
+        _offset = '' if book[i][2] == 0 else ' - %d' % book[i][2]
+        _str += emit_tvm_body(it, props) + '%s, ' % _offset
+      _str = _str[:-2] + ']'
     else:
       for i, it in enumerate(index):
         _str += emit_tvm_body(it, props) + ', '
       _str = _str[:-2] + ']'
     return _str
   elif node._op == 'axis':
-    if 'slices' in props and node._value['name'] in [x for x in props['slices'][0][0]]:
-      return '(' + warp_axis(node._value['name']) + ' + _' + warp_axis(node._value['name'])+ ')'
-    else:
-      return warp_axis(node._value['name'])
+    return warp_axis(node._value['name'])
   elif node._op == 'op':
     op_name = node._value["name"]
     op_input_size = len(node._value["inputs"])
@@ -276,10 +270,10 @@ def emit_tvm_body(node, props):
   elif node._op == 'cast':
     return '%s.astype(cast_dtype("%s"))' % (emit_tvm_body(node._value["inputs"][0], props), node._value['name'])
   elif node._op == 'call':
-    return 'tvm.call_pure_extern(cast_dtype("%s"), "%s", %s)' % (node._dtype, node._value['name'], ', '.join([emit_tvm_body(x, props) for x in node._value["inputs"]]))
+    return 'tir.call_pure_extern(cast_dtype("%s"), "%s", %s)' % (node._dtype, node._value['name'], ', '.join([emit_tvm_body(x, props) for x in node._value["inputs"]]))
   elif node._op == 'when':
     all_conds = [emit_tvm_body(cond, props) for cond in node._value['if']]
-    return 'tvm.if_then_else(tvm.all(' + ', '.join(all_conds) + '), t=' + emit_tvm_body(node._value['true'], props) + ', f=' + emit_tvm_body(node._value['false'], props) + ')'
+    return 'tir.if_then_else(te.all(' + ', '.join(all_conds) + '), t=' + emit_tvm_body(node._value['true'], props) + ', f=' + emit_tvm_body(node._value['false'], props) + ')'
   else:
     raise Exception('Unrecognized node type: %s' % node._op)
 
@@ -288,6 +282,8 @@ def walk_in_ast(node, func, args, parent, attr_id):
   def _walk(node, parent, attr_id):
     updated_node = func(node, *args)
     if updated_node is not None:
+      if isinstance(updated_node, str) and updated_node == '':
+        return
       updated_node = copy.deepcopy(updated_node)
       if isinstance(parent, OpTensor):
         setattr(parent, attr_id, updated_node)
@@ -400,23 +396,22 @@ def build_fused_ast(statements, input_dict):
 
 def emit_tvm_ir(exprss, input_dict):
   ast = build_fused_ast(exprss, input_dict)
+  arg_props = {'_in': [], '_out': []}
+  for k in ast['props']['input_dict']:
+    prop = copy.deepcopy(ast['props']['input_dict'][k])
+    prop['name'] = k
+    arg_props['_in'].append(prop)
+  for k in ast['props']['output_dict']:
+    prop = copy.deepcopy(ast['props']['output_dict'][k])
+    prop['name'] = k
+    arg_props['_out'].append(prop)
+  arg_props['_in'].sort(key=lambda x: x['name'])
+  arg_props['_out'].sort(key=lambda x: x['name'])
+  os.environ['GLOBAL_ARG_PROPS'] = json.dumps(arg_props)
+ 
   from lang.auto_shard import auto_shard_on_ast
   auto_shard_on_ast(ast)
   bias_axis_body = ''
-  if 'slices' in ast['props']:
-    axis_dict, tensor_dict = ast['props']['slices'][0]
-    for k in axis_dict:
-      bias_axis_body += '_%s = input("_%s", [1], dtype="int32")[0]; ' % (k , k)
-    for k in tensor_dict:
-      bias_axis_body += '_%s = input("_%s", [1], dtype="int32")[0]; ' % (k , k)
-
-    slices_info = {
-      'data_axes': ast['props']['data_axes'],
-      'slices': ast['props']['slices'],
-    }
-    from antares.common import local_get_dir_file
-    with open(local_get_dir_file('slices.json'), 'w') as fp:
-      json.dump(slices_info, fp)
 
   def emit_input_body(input_dict):
     input_body = ''
@@ -433,7 +428,7 @@ def emit_tvm_ir(exprss, input_dict):
         axis_name = warp_axis(x['name'])
         reduce_set.append(axis_name)
         reduce_body += '%s = loop(%d); ' % (axis_name, x['range'])
-      reduce_maps = {'+': 'tvm.sum', '>': 'tvm.max', '<': 'tvm.min'}
+      reduce_maps = {'+': 'te.sum', '>': 'te.max', '<': 'te.min'}
       if props['reduce_type'] in reduce_maps:
         reduce_func = reduce_maps[props['reduce_type']]
       else:

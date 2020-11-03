@@ -90,6 +90,11 @@ for key in benchmarks:
     for i in range(0, 8):
         for j in range(0, 8):
             for k in range(0, 8):
+                size = 64 * 1024
+                dim = [-1, pow(2, i), pow(2, j), pow(2, k)]
+                TB_count = size // (dim[1] * dim[2] * dim[3])
+                if TB_count < 1:
+                    continue
                 #for config in configs[key]:
                 config = '{' + "\"axis_0\"" + ': [-1, {}, {}, {}], "reorder": [0], "reduce_0": [-1, 1, 1]'.format(pow(2, i), pow(2, j), pow(2, k)) + '}'
                 cmd = "cd ..; sudo BACKEND=c-cuda CONFIG=\'{}\' COMPUTE_V1=\'{}\' make; cd examples".format(config, benchmarks[key])
@@ -97,9 +102,6 @@ for key in benchmarks:
                 dir_path = os.path.join(sample_dir, key, str(v))
                 os.makedirs(dir_path)
                 os.system(cmd)
-                dim = json.loads(config)["axis_0"]
-                size = 128 * 1024 * 1024
-                TB_count = size // (dim[1] * dim[2] * dim[3])
                 TB_size = dim[2]
                 os.system("sudo mv /mydata/libAntares/cache/* {}".format(dir_path))
                 os.system("cp {}/_/my_kernel.out .".format(dir_path))
@@ -108,6 +110,7 @@ for key in benchmarks:
                 os.system("sudo /opt/nvidia/nsight-compute/2020.1.2/ncu --set full ./ReduceSumTest {} {}".format(TB_count, TB_size))
                 v += 1
 
+    """
     for config in configs[key]:
         cmd = "cd ..; sudo CONFIG=\'{}\' BACKEND=c-cuda COMPUTE_V1=\'".format(config) + benchmarks[key] + "\' make; cd examples"
         data_path = os.path.join(sample_dir, key, str(v))
@@ -117,4 +120,4 @@ for key in benchmarks:
         os.system(cmd)
         os.system("sudo mv /mydata/libAntares/cache/* {}".format(data_path))
         v += 1
-
+    """

@@ -28,11 +28,11 @@ sudo BACKEND=c-cuda make
 
 # If you need Antares to extend/boost Tensorflow operators, please also run:
 sudo python3 ./frameworks/antares/tensorflow/setup.py
-# (Recommended Tensorflow CUDA Installation Source: pip3 install --upgrade pip && pip3 install tensorflow-gpu==1.15.3)
+# (Recommended Tensorflow CUDA Installation Source (for CUDA 10.0): pip3 install --upgrade pip && pip3 install tensorflow-gpu==1.15.3)
 
 # If you need Antares to extend/boost Pytorch operators, please also run:
 sudo python3 ./frameworks/antares/pytorch/setup.py
-# (Recommended Pytorch CUDA Installation Source: pip3 install torch==1.5.0 torchvision==0.6.0 -f https://download.pytorch.org/whl/torch_stable.html)
+# (Recommended Pytorch CUDA Installation Source (for CUDA 10.0): pip3 install torch==1.5.0 torchvision==0.6.0 -f https://download.pytorch.org/whl/torch_stable.html)
 ```
 
 # Startup with First Example (CUDA example):
@@ -115,11 +115,11 @@ Antares can support multi-line statements as long as they are fuse-able, for exa
 | Platform: ROCm HIP C |  Y | - |
 | Platform: GraphCore | Y | - |
 | Decoupling for Multi-Platforms | Y | - |
-| Workflow: Auto Plan Spaces | Y | - |
+| Workflow: Auto Shard | Y | - |
 | Workflow: Auto Infershape | Y | - |
-| Language | Simple Antares IR | Hyrbid Script/Topi/.. |
-| Framework: Custom Op for Tensorflow | Y | - |
-| Framework: Custom Op for Pytorch | Y | - |
+| Language | Antares IR | Hyrbid Script/Topi/.. |
+| Framework: JIT Op Maker for Tensorflow | Y | - |
+| Framework: JIT Op Maker for Pytorch | Y | - |
 
 # Current Feature Table:
 
@@ -138,6 +138,8 @@ Antares can support multi-line statements as long as they are fuse-able, for exa
 -----------
 
 # How to Tune Expressions:
+
+## Local tuning:
 
 If you want automatic ways to optimize the operator (described in your environmental variable `COMPUTE_V1`), you just need to add one more variable in your first-run examples: `STEP=1000`,
 which means Antares will take 1000 chances to search for a potenially better kernel version. For example,
@@ -164,6 +166,17 @@ If you want to auto commit the result together with tuning procedure, you can ju
 
 After you commit the results, the Antares REST Server will detect this record and response this code version to other frameworks once they newly requests the expression case you saved.
 
+## Remote tunning:
+
+For DirectX12 platform, you could use remote mode to tune expressions. Compared to local tunning, there are two extra things to do:
+
+1) Start remote tuning server on the target machine, reference to [HLSL server](platforms/c-hlsl/evaluator/TestCompute_cs_5_0)
+
+2) Add server host into the tunning expression
+```sh
+COMMIT=1 AGENT_URL=${Host_IP}:${Host_Port} CONFIG='{"axis_0": [-1, 16, 64, 1], "reorder": [0]}' COMPUTE_V1='- einstein_v2("output0[N] = input0[N] + input1[N]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 512]}, "input1": {"dtype": "float32", "shape": [1024 * 512]}})' BACKEND=c-hlsl make
+```
+
 # How to run Antares REST Server for different platforms:
 You can add environment variable `HTTP_PORT=<portnum>` to change the listening port, by default, it will be listening on localhost:8880:
 ```sh
@@ -173,12 +186,9 @@ You can add environment variable `HTTP_PORT=<portnum>` to change the listening p
 ```
 
 # How to use custom tuners as searching algorithms:
-Custom tuners can be chosen by adding variable `TUNER=..`, and the value can be selected from any filename under folder `tuner/`:
+Custom tuners can be chosen by adding variable `TUNER=..`, and the value can be selected from any filename under folder `tuner/`, e.g.:
 ```sh
-    STEP=100 BACKEND=c-cuda make
-
-    # Adding `RECORD=<filename>` can help you record the incremental tuning history
-    RECORD=history.log STEP=100 BACKEND=c-cuda make
+    TUNER=AutoTVM2 STEP=100 BACKEND=c-cuda make
 ```
 
 # About Microsft Open Source
