@@ -99,38 +99,6 @@ def compile_source(code):
   with open(kernel_out, "rb") as fp:
     return bytearray(fp.read())
 
-<<<<<<< HEAD
-def run_config_entity(params_given, dir_sid, expected_timecost='inf', tune_slot_id=0):
-  dir_sid = str(dir_sid)
-  result_file = local_get_dir_file('result.txt', dir_sid)
-  try:
-    os.remove(result_file)
-  except:
-    pass
-  config_str = json.dumps(params_given)
-  envs = os.environ.copy()
-  envs['CONFIG'] = config_str
-  envs['DIR_SID'] = dir_sid
-  envs[unified_slot_key] = str(tune_slot_id)
-  expected_timecost = float(expected_timecost)
-  if math.isinf(expected_timecost):
-    expected_timecost = 60.0
-  envs['EXPECTED_TIMEOUT'] = str(expected_timecost)
-  print("  >> [ ] Param_entity on sid = %s: config = %s, slot_id = %d, expected_timecost = %.6f s" % (dir_sid, config_str, tune_slot_id, expected_timecost))
-  try:
-    assert(True == run_process_with_timeout(["python%d" % sys.version_info.major] + sys.argv, envs=envs))
-    with open(result_file, 'r') as fp:
-      parts = fp.read().split()
-      result = float(parts[0].strip())
-      digest = float(parts[1].strip()) if len(parts) > 1 else float('inf')
-      print("@@@@@@@@@@@ MY DEBUG: config = %s, source_path = %s, perf = %s @@@@@@@@@@@" % (config_str, local_get_dir_file('my_kernel.cc', dir_sid), result))
-  except:
-    result = digest = float('inf')
-  print("  >> [*] Param_entity on sid = %s: config = %s, result = `%.6f`, digest = `%g`" % (dir_sid, config_str, result, digest))
-  return result
-
-=======
->>>>>>> upstream/master
 def compute_gflops(flop, t):
   try:
     return flop / (t * 1e3) / 1e6
