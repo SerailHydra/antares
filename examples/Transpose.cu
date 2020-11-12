@@ -17,7 +17,7 @@
 const int input_size = 64 * 1024 * 1024;
 const int output_size = input_size;
 
-const int K = 8;
+const int K = 2;
 const int stride = 32 / K;
 
 #include "cu_helper.h"
@@ -26,21 +26,29 @@ __global__ void Transpose(float *input, float *output)
 {
 	__shared__ float shared[1024];
 	for (int i = 0; i < K; ++ i)
-		shared[threadIdx.y * 32 + (threadIdx.y + threadIdx.x + stride * i) % 32] = input[blockIdx.y * 262144 + blockIdx.x * 32 + threadIdx.y * 8192 + threadIdx.x + stride * i];
+		shared[(threadIdx.y + stride * i) * 32 + (threadIdx.y + threadIdx.x + stride * i) % 32] = input[blockIdx.y * 262144 + blockIdx.x * 32 + (threadIdx.y + stride * i) * 8192 + threadIdx.x];
 	__syncthreads();
 	for (int i = 0; i < K; ++ i)
-		output[blockIdx.x * 262144 + blockIdx.y * 32 + threadIdx.y * 8192 + threadIdx.x + stride * i] = shared[(threadIdx.x + stride * i) * 32 + (threadIdx.y + threadIdx.x + stride * i) % 32];
+		output[blockIdx.x * 262144 + blockIdx.y * 32 + (threadIdx.y + stride * i) * 8192 + threadIdx.x] = shared[threadIdx.x * 32 + (threadIdx.y + threadIdx.x + stride * i) % 32];
+}
+
+__global__ void Transpose_(float *input, float *output)
+{
+	__shared__ float shared[1024];
+	for (int i = 0; i < K; ++ i)
+		shared[threadIdx.y * 32 + (threadIdx.x + stride * i)] = input[blockIdx.y * 262144 + blockIdx.x * 32 + threadIdx.y * 8192 + threadIdx.x + stride * i];
+	__syncthreads();
+	for (int i = 0; i < K; ++ i)
+		output[blockIdx.x * 262144 + blockIdx.y * 32 + threadIdx.y * 8192 + threadIdx.x + stride * i] = shared[(threadIdx.x + stride * i) * 32 + threadIdx.y];
 }
 
 __global__ void Transpose1(float* __restrict__ input0, float* __restrict__ output0) {
 	// [thread_extent] blockIdx.x = 1024
-	// [thread_extent] threadIdx.x = 2
+	// [thread_extent] threadIdx.x = 4
 	// [thread_extent] blockIdx.y = 64
 	// [thread_extent] threadIdx.y = 128
-	output0[(((((((int)blockIdx.x) * 65536) + (((int)threadIdx.x) * 16384 * 2)) + (((int)blockIdx.y) * 128)) + ((int)threadIdx.y)))] = input0[(((((((int)blockIdx.y) * 1048576) + (((int)threadIdx.y) * 8192)) + (((int)blockIdx.x) * 8)) + (((int)threadIdx.x) * 4)))];
-	output0[((((((((int)blockIdx.x) * 65536) + (((int)threadIdx.x) * 16384 * 2)) + (((int)blockIdx.y) * 128)) + ((int)threadIdx.y)) + 8192))] = input0[((((((((int)blockIdx.y) * 1048576) + (((int)threadIdx.y) * 8192)) + (((int)blockIdx.x) * 8)) + (((int)threadIdx.x) * 4)) + 1))];
-	output0[((((((((int)blockIdx.x) * 65536) + (((int)threadIdx.x) * 16384 * 2)) + (((int)blockIdx.y) * 128)) + ((int)threadIdx.y)) + 8192 * 2))] = input0[((((((((int)blockIdx.y) * 1048576) + (((int)threadIdx.y) * 8192)) + (((int)blockIdx.x) * 8)) + (((int)threadIdx.x) * 4)) + 2))];
-	output0[((((((((int)blockIdx.x) * 65536) + (((int)threadIdx.x) * 16384 * 2)) + (((int)blockIdx.y) * 128)) + ((int)threadIdx.y)) + 8192 * 3))] = input0[((((((((int)blockIdx.y) * 1048576) + (((int)threadIdx.y) * 8192)) + (((int)blockIdx.x) * 8)) + (((int)threadIdx.x) * 4)) + 3))];
+	output0[(((((((int)blockIdx.x) * 65536) + (((int)threadIdx.x) * 16384)) + (((int)blockIdx.y) * 128)) + ((int)threadIdx.y)))] = input0[(((((((int)blockIdx.y) * 1048576) + (((int)threadIdx.y) * 8192)) + (((int)blockIdx.x) * 8)) + (((int)threadIdx.x) * 2)))];
+	output0[((((((((int)blockIdx.x) * 65536) + (((int)threadIdx.x) * 16384)) + (((int)blockIdx.y) * 128)) + ((int)threadIdx.y)) + 8192))] = input0[((((((((int)blockIdx.y) * 1048576) + (((int)threadIdx.y) * 8192)) + (((int)blockIdx.x) * 8)) + (((int)threadIdx.x) * 2)) + 1))];
 }
 
 __global__ void Transpose2(float* __restrict__ input0, float* __restrict__ output0) {
@@ -90,11 +98,10 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < input_size; ++ i)
 		Ah[i] = i;
 	cudaMemcpy(Ad, Ah, input_size * sizeof(float), cudaMemcpyHostToDevice);
-
-	/*
+	
 	dim3 Grid(256, 256, 1);
-	dim3 Block(stride, 32, 1);
-	for (int i = 0; i < 100; ++ i)
+	dim3 Block(32, stride, 1);
+	for (int i = 0; i < 1; ++ i)
 	{
 		Transpose <<<Grid, Block>>> (Ad, Bd);
 		cudaDeviceSynchronize();
@@ -104,9 +111,9 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "pass!\n");
 	else
 		fprintf(stderr, "error!\n");
-	*/
+	
 	dim3 Grid1(1024, 64, 1);
-	dim3 Block1(2, 128, 1);
+	dim3 Block1(64, 128, 1);
 	for (int i = 0; i < 1; ++ i)
 	{
 		Transpose1 <<<Grid1, Block1>>> (Ad, Bd);
@@ -117,7 +124,7 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "pass!\n");
 	else
 		fprintf(stderr, "error!\n");
-	/*
+	
         dim3 Grid2(2048, 128, 1);
 	dim3 Block2(4, 32, 1);
 	for (int i = 0; i < 1; ++ i)
@@ -133,7 +140,7 @@ int main(int argc, char *argv[])
 	
         dim3 Grid3(1024, 128, 1);
 	dim3 Block3(4, 64, 1);
-	for (int i = 0; i < 100; ++ i)
+	for (int i = 0; i < 1; ++ i)
 	{
 		Transpose3 <<<Grid3, Block3>>> (Ad, Bd);
 		cudaDeviceSynchronize();
@@ -143,5 +150,4 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "pass!\n");
 	else
 		fprintf(stderr, "error!\n");
-	*/
 }
