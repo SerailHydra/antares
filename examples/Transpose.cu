@@ -101,7 +101,7 @@ int main(int argc, char *argv[])
 	
 	dim3 Grid(256, 256, 1);
 	dim3 Block(32, stride, 1);
-	for (int i = 0; i < 1; ++ i)
+	for (int i = 0; i < 100; ++ i)
 	{
 		Transpose <<<Grid, Block>>> (Ad, Bd);
 		cudaDeviceSynchronize();
@@ -111,10 +111,10 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "pass!\n");
 	else
 		fprintf(stderr, "error!\n");
-	
+
 	dim3 Grid1(1024, 64, 1);
-	dim3 Block1(64, 128, 1);
-	for (int i = 0; i < 1; ++ i)
+	dim3 Block1(4, 128, 1);
+	for (int i = 0; i < 100; ++ i)
 	{
 		Transpose1 <<<Grid1, Block1>>> (Ad, Bd);
 		cudaDeviceSynchronize();
@@ -127,7 +127,7 @@ int main(int argc, char *argv[])
 	
         dim3 Grid2(2048, 128, 1);
 	dim3 Block2(4, 32, 1);
-	for (int i = 0; i < 1; ++ i)
+	for (int i = 0; i < 100; ++ i)
 	{
 		Transpose2 <<<Grid2, Block2>>> (Ad, Bd);
 		cudaDeviceSynchronize();
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 	
         dim3 Grid3(1024, 128, 1);
 	dim3 Block3(4, 64, 1);
-	for (int i = 0; i < 1; ++ i)
+	for (int i = 0; i < 100; ++ i)
 	{
 		Transpose3 <<<Grid3, Block3>>> (Ad, Bd);
 		cudaDeviceSynchronize();
