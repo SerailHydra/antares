@@ -1,5 +1,5 @@
 COMPUTE_V1 ?= - einstein_v2("output0[N] = input0[N] + input1[N]", input_dict={"input0": {"dtype": "float32", "shape": [1024 * 512]}, "input1": {"dtype": "float32", "shape": [1024 * 512]}})
-BACKEND ?= c-rocm
+BACKEND ?=
 TUNER ?=
 STEP ?= 0
 CONFIG ?=
@@ -18,7 +18,7 @@ PARAMS ?=  docker run -v $(shell pwd):/antares -w /antares/antares --privileged 
 	-e COMMIT=$(COMMIT) -e HARDWARE_CONFIG=$(HARDWARE_CONFIG)
 
 HTTP_PORT ?= 8880
-HTTP_NAME ?= AntaresServer-$(HTTP_PORT)_$(BACKEND)
+HTTP_NAME ?= AntaresServer-$(HTTP_PORT)_$(or $(BACKEND), $(BACKEND), default)
 HTTP_EXEC ?= $(PARAMS) -d --name=$(HTTP_NAME) -p $(HTTP_PORT):$(HTTP_PORT) antares
 
 eval: build

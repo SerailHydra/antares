@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
 
 	dim3 Grid1(1024, 64, 1);
 	dim3 Block1(4, 128, 1);
-	for (int i = 0; i < 100; ++ i)
+	for (int i = 0; i < 1; ++ i)
 	{
 		Transpose1 <<<Grid1, Block1>>> (Ad, Bd);
 		cudaDeviceSynchronize();
